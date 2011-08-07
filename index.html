@@ -1,0 +1,62 @@
+<html>
+<body>
+<p>Comet, yah!</p>
+
+<div id="writer"></div>
+<div id="evaler"></div>
+<script>
+var streamreq;
+var byteoffset;
+var newdata;
+
+function abort() {
+    streamreq.abort();
+}
+
+function newXmlHttp() {
+    var xhr = null;
+    try { xhr = new ActiveXObject("Msxml2.XMLHTTP"); } catch (e) {
+        try { xhr = new ActiveXObject("Microsoft.XMLHTTP"); } catch (e) {
+            try { xhr = new XMLHttpRequest(); } catch(e) { return false }
+        }
+    }
+    return xhr;
+}
+
+function startstream() {
+    streamreq = newXmlHttp();
+
+    byteoffset = 0;
+    newdata = "";
+    var url = "/server_push?" + Math.floor(Math.random() * 1024);
+    streamreq.open("GET", url, true);
+    streamreq.onreadystatechange = function() {
+        if (typeof streamreq == "undefined") return;
+        if (streamreq.readyState == 3) {
+            //extractEvents(streamreq.responseText);
+        } else if (streamreq.readyState == 4) {
+            //extractEvents(streamreq.responseText);
+            delete streamreq;
+            if (typeof(r)=="function") {
+                r();
+            }
+        }
+    }
+    streamreq.send(null);
+}
+
+var lastmsglength = 0;
+window.onload = function() {
+    setTimeout(startstream, 1);
+    setInterval(function () {
+       var content = streamreq.responseText.substr(lastmsglength, streamreq.responseText.length);
+       lastmsglength = streamreq.responseText.length;
+       if (content.indexOf("script") > -1) {
+         var js = content.split("<script type=\"text/javascript\">").pop().split("</" + "script>").shift();
+         eval(js);
+       }
+    }, 1000);
+}
+</script>
+</body>
+</html>
