@@ -204,22 +204,21 @@ package body WS_CB is
       use GNAT.Calendar;
       Now       : Ada.Calendar.Time;
    begin
-      accept Push do
-         Now := Ada.Calendar.Clock;
-         Ada.Text_IO.Put_Line ("Tick " & Second (Now)'Img & " " & Chat_Push.Count(SP)'Img);
-         -- This sends to all clients;
-         Chat_Push.Send (
-            Server => SP, 
-            Data => To_Unbounded_String(
-               "<script type=""text/javascript"">" &
-               "document.getElementById(""writer"").innerHTML = """ &
-               "Connections: " & Chat_Push.Count(SP)'Img & "<br>" &
-               "<br>Ping!<br>" & Second (Now)'Img & """;</script>"
-            ), 
-            Content_Type => "text/html",
-            Client_Gone => Check_Client'Access
-         );
-      end Push;
+      accept Push;
+      Now := Ada.Calendar.Clock;
+      Ada.Text_IO.Put_Line ("Tick " & Second (Now)'Img & " " & Chat_Push.Count(SP)'Img);
+      -- This sends to all clients;
+      Chat_Push.Send (
+         Server => SP, 
+         Data => To_Unbounded_String(
+            "<script type=""text/javascript"">" &
+            "document.getElementById(""writer"").innerHTML = """ &
+            "Connections: " & Chat_Push.Count(SP)'Img & "<br>" &
+            "<br>Ping!<br>" & Second (Now)'Img & """;</script>"
+         ), 
+         Content_Type => "text/html",
+         Client_Gone => Check_Client'Access
+      );
    end Server_Push_Task_Type;
 
    -------------------

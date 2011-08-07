@@ -57,7 +57,7 @@ procedure WS is
             select
                Server_Push_Task.Push;
             or
-               delay 0.1;
+               delay 1.0;
                Text_IO.Put_Line ("Too busy");
             end select;
          end;
