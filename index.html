@@ -1,31 +1,56 @@
 <html>
 <body>
 <p>Comet, yah!</p>
-<form id="sendForm" action="send" method="get" onsubmit="retrun false;">
+<form id="sendForm" action="send" method="get" onsubmit="return false;">
+   <input type="hidden" name="clientId" id="clientId">
    Message: <input type="text" name="msg" id="msg">
    <input type="submit" name="send" value="Send">
 </form>
+<div id="messages"></div>
 <div id="writer"></div>
 
 <script type="text/javascript" src="http://ajax.googleapis.com/ajax/libs/mootools/1.3.2/mootools-yui-compressed.js"></script>
 <script type="text/javascript">
-var req;
+var req, connectionId;
 function startstream() {
-    req = new Request({
-      url: "/server_push?" + Math.floor(Math.random() * 1024)
-    });
-    req.send();
+   connectionId = generateUniqueId();
+   req = new Request({
+      url: "/server_push"
+   });
+   req.get({
+      id: connectionId,
+      prop: Math.floor(Math.random() * 1024)
+   });
+}
+
+function generateUniqueId() {
+   var id = '';
+   for(var i = 0; i < 16; i++) {
+      id += String.fromCharCode(
+         Math.min(64 + Math.floor(Math.random() * 58), 122)
+      );
+   }
+   
+   return id;
 }
 
 function setClientId(id) {
    window.clientId = id;
+   $('clientId').set('value', id);
 }
 
 var lastmsglength = 0;
 window.addEvent('domready', function () {
     startstream();
     $('sendForm').addEvent('submit', function (evt) {
-      this.send();
+      var req = new Request({
+         url: this.get('action'),
+         onRequest: function () {
+            $('msg').set('value', '');
+         }
+      });
+      req.send(this);
+      
     });
     (function () {
        var content = req.xhr.responseText.substr(lastmsglength, req.xhr.responseText.length);
@@ -43,7 +68,7 @@ window.addEvent('domready', function () {
        } else {
          //-- Did the connection die?
        }
-    }).periodical(1000);
+    }).periodical(250);
 });
 </script>
 </body>

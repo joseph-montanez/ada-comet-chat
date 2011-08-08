@@ -46,8 +46,7 @@ with AWS.Services.Directory;
 with AWS.Server.Push;
 with AWS.Translator;
 with AWS.Utils;
-with Ada.Containers.Vectors;  
-with Ada.Containers.Indefinite_Vectors;    
+with Ada.Containers.Vectors;    
 with Templates_Parser;
 with Client;
 
@@ -68,6 +67,7 @@ package body WS_CB is
       return a.Get_Id = b.Get_Id;
    end;
    
+   
    package String_Client_Maps is new Ada.Containers.Indefinite_Hashed_Maps (
       Key_Type        => String,
       Element_Type    => Client.Object,
@@ -76,15 +76,8 @@ package body WS_CB is
    );
    use String_Client_Maps;
    
-   
-   package Messages_Container is new Ada.Containers.Indefinite_Vectors (
-      Index_Type => Natural,
-      Element_Type => String
-   );
-   use Messages_Container;
-   
    Connections : String_Client_Maps.Map;
-   Messages    : Messages_Container.Vector;
+   Messages    : Client.Buffer_Container;
 
    --  Simple ID generator
    
@@ -132,14 +125,11 @@ package body WS_CB is
               := To_Unbounded_String (AWS.Parameters.Get_Value (P_List));
             Msg       : Unbounded_String;
          begin
-            Append (Msg, AWS.Parameters.Get (P_List, "clientId"));
-            Append (Msg, ": ");
-            Append (Msg, AWS.Parameters.Get (P_List, "msg"));
-            Append (Msg, "<br>");
-            Messages.Append (To_String (Msg));
-            return AWS.Response.Build ("text/html", 
-               To_Unbounded_String ("Good")
-            );
+            Msg := To_Unbounded_String (AWS.Parameters.Get (P_List, "msg"));
+            Messages.Append (Msg);
+            return AWS.Response.Acknowledge
+              (Messages.S404,
+               "<p>Page '" & URI & "' Not found.");
          end;
       elsif URI = "/server_push" then
 
@@ -159,7 +149,7 @@ package body WS_CB is
             
             -- Add the client to the connections list
             Session.Set_Id (Client_Id);
-            Session.Set_Connection_Id (AWS.Parameters.Get (P_List, "id"));
+            Session.Set_ConnectionId (AWS.Parameters.Get (P_List, "id"));
             Connections.Insert (
                Client_Id, Session
             );
@@ -185,7 +175,7 @@ package body WS_CB is
          return AWS.Response.Socket_Taken;
       else
          return AWS.Response.Acknowledge
-           (AWS.Messages.S404,
+           (Messages.S404,
             "<p>Page '" & URI & "' Not found.");
       end if;
    end Get;
@@ -217,7 +207,7 @@ package body WS_CB is
          return Put (Request);
 
       else
-         return AWS.Response.Acknowledge (Status_Code => AWS.Messages.S405);
+         return AWS.Response.Acknowledge (Status_Code => Messages.S405);
       end if;
 
    exception
@@ -265,40 +255,27 @@ package body WS_CB is
 
    task body Server_Push_Task_Type is
       use GNAT.Calendar;
-      Now   : Ada.Calendar.Time;
-      Msg   : Unbounded_String;
-      Data  : Unbounded_String;
-      Index : Messages_Container.Cursor;
+      Now : Ada.Calendar.Time;
+      Msg : Unbounded_String;
    begin
       accept Push;
       Now := Ada.Calendar.Clock;
       Ada.Text_IO.Put_Line ("Tick " & Second (Now)'Img & " " & Chat_Push.Count(SP)'Img);
       -- This sends to all clients;
-      
-      Append (Data, "document.getElementById(""writer"").innerHTML = """ &
-         "Connections: " & Connections.Length'Img & "<br>" &
-         "<br>Ping!<br>" & Second (Now)'Img & """;"
-      );
-      
       Index := Messages.First;
-      
-      while Index /= Messages_Container.No_Element loop
-         Append (Msg, To_Unbounded_String (Element(Index)));
+      while Index /= No_Element loop
+         Msg.Append (Element(Index));
          Messages.Delete(Index);
-         Index := Messages_Container.Next (Index);
+         Index := Next (Index);
       end loop;
-      
-      if Length (Msg) /= 0 then
-         -- TODO: must escape double quotes
-         Append (Data, "document.getElementById(""messages"").innerHTML += """);
-         Append (Data, Msg);
-         Append (Data, """;");
-      end if;
-      
-      --Messages.
+      Messages.
       Chat_Push.Send (
          Server => SP, 
-         Data => To_Unbounded_String (js (To_String (Data))), 
+         Data => To_Unbounded_String (js (
+            "document.getElementById(""writer"").innerHTML = """ &
+            "Connections: " & Connections.Length'Img & "<br>" &
+            "<br>Ping!<br>" & Second (Now)'Img & """;"
+         )), 
          Content_Type => "text/html",
          Client_Gone => Check_Client'Access
       );
