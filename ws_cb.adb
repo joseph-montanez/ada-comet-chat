@@ -48,6 +48,7 @@ with AWS.Translator;
 with AWS.Utils;
 with Ada.Containers.Vectors;    
 with Templates_Parser;
+with Client;
 
 package body WS_CB is
 
@@ -60,8 +61,28 @@ package body WS_CB is
       Start   : Time;
       Picture : Unbounded_String;
    end record;
+   
+   function "="(a, b: Client.Object) return Boolean is
+   begin
+      return a.Get_Id = b.Get_Id;
+   end;
+   
+   package String_Client_Maps is new Ada.Containers.Indefinite_Hashed_Maps (
+      Key_Type        => String,
+      Element_Type    => Client.Object,
+      Hash            => Ada.Strings.Hash,
+      Equivalent_Keys => "="
+   );
+   use String_Client_Maps;
+   
+   Connections : String_Client_Maps.Map;
 
    --  Simple ID generator
+   
+   function js (code : String) return String is
+   begin
+      return "<script type=""text/javascript"">" & code & "</script>";
+   end;
 
    protected New_Client_Id is
       procedure Get (New_Id : out String);
@@ -106,8 +127,15 @@ package body WS_CB is
             Picture   : Unbounded_String
               := To_Unbounded_String (AWS.Parameters.Get_Value (P_List));
             Client_Id : String (1 .. 32);
+            Session   : Client.Object;
          begin
             New_Client_Id.Get (Client_Id);
+            
+            -- Add the client to the connections list
+            Session.Set_Id (Client_Id);
+            Connections.Insert (
+               Client_Id, Session
+            );
 
             Chat_Push.Register
               (Server      => SP,
@@ -115,6 +143,15 @@ package body WS_CB is
                Socket      => AWS.Status.Socket (Request),
                Environment => (Clock, Picture),
                Kind        => Chat_Push.Chunked);
+               
+            -- Send back their connection id
+            Chat_Push.Send_To (
+               Server => SP,
+               Client_Id => Client_Id,
+               Data => To_Unbounded_String( 
+                  js ("setClientId('" & Client_Id & "');")
+               )
+            );
             
          end;
 
@@ -189,10 +226,9 @@ package body WS_CB is
    end To_Array;
    
    procedure Check_Client (Client_Id : String) is
-      Key_Id : String (1 .. 32);
    begin
       -- This is wherre you would do clean up
-      Key_Id := Ada.Strings.Fixed.Trim (Client_Id, Ada.Strings.Left);
+      Connections.Delete (Client_Id);
       Ada.Text_IO.Put_Line ("Client Gone: " & Client_Id);
    end;
 
@@ -213,7 +249,8 @@ package body WS_CB is
          Data => To_Unbounded_String(
             "<script type=""text/javascript"">" &
             "document.getElementById(""writer"").innerHTML = """ &
-            "Connections: " & Chat_Push.Count(SP)'Img & "<br>" &
+            --  "Connections: " & Chat_Push.Count(SP)'Img & "<br>" &
+            "Connections: " & Connections.Length'Img & "<br>" &
             "<br>Ping!<br>" & Second (Now)'Img & """;</script>"
          ), 
          Content_Type => "text/html",

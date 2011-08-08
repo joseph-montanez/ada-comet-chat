@@ -1,9 +1,11 @@
 <html>
 <body>
 <p>Comet, yah!</p>
-
+<form id="sendForm" action="send" method="get" onsubmit="retrun false;">
+   Message: <input type="text" name="msg" id="msg">
+   <input type="submit" name="send" value="Send">
+</form>
 <div id="writer"></div>
-<div id="evaler"></div>
 
 <script type="text/javascript" src="http://ajax.googleapis.com/ajax/libs/mootools/1.3.2/mootools-yui-compressed.js"></script>
 <script type="text/javascript">
@@ -15,15 +17,31 @@ function startstream() {
     req.send();
 }
 
+function setClientId(id) {
+   window.clientId = id;
+}
+
 var lastmsglength = 0;
 window.addEvent('domready', function () {
     startstream();
+    $('sendForm').addEvent('submit', function (evt) {
+      this.send();
+    });
     (function () {
        var content = req.xhr.responseText.substr(lastmsglength, req.xhr.responseText.length);
+       //console.log(content);
        lastmsglength = req.xhr.responseText.length;
        if (content.indexOf("script") > -1) {
-         var js = content.split("<script type=\"text/javascript\">").pop().split("</" + "script>").shift();
-         eval(js);
+         var parts = content.split("<script type=\"text/javascript\">");
+         for (var i = 0; i < parts.length; i++) {
+            var part = parts[i];
+            if (part.indexOf ('<\/script>') > -1) {
+               var js = part.split("</" + "script>").shift();
+               eval(js);
+            }
+         }
+       } else {
+         //-- Did the connection die?
        }
     }).periodical(1000);
 });
