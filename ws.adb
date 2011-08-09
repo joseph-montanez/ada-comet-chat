@@ -52,8 +52,8 @@ procedure WS is
          declare
             Server_Push_Task : WS_CB.Server_Push_Task_Type;
          begin
-            delay 1.0;
-            Text_IO.Put_Line ("Tock");
+            delay 0.15;
+            --  Text_IO.Put_Line ("Tock");
             select
                Server_Push_Task.Push;
             or

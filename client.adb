@@ -2,20 +2,20 @@ with Ada.Containers.Indefinite_Vectors;
 
 package body Client is
 
-   function Get_Id (Self : Object) return String is
+   function Get_Client_Id (Self : Object) return String is
    begin
-      return Self.Id;
-   end Get_Id;
+      return Self.Client_Id;
+   end Get_Client_Id;
 
    function Get_Connection_Id (Self : Object) return String is
    begin
       return Self.Connection_Id;
    end Get_Connection_Id;
 
-   procedure Set_Id (Self : in out Object; Id : String) is
+   procedure Set_Client_Id (Self : in out Object; Client_Id : String) is
    begin
-      Self.Id := Id;
-   end Set_Id;
+      Self.Client_Id := Client_Id;
+   end Set_Client_Id;
 
    procedure Set_Connection_Id (Self : in out Object; Connection_Id : String) is
    begin

@@ -9,16 +9,20 @@
 <div id="messages"></div>
 <div id="writer"></div>
 
-<script type="text/javascript" src="http://ajax.googleapis.com/ajax/libs/mootools/1.3.2/mootools-yui-compressed.js"></script>
+<script type="text/javascript" src="http://ajax.googleapis.com/ajax/libs/mootools/1.3.2/mootools.js"></script>
 <script type="text/javascript">
-var req, connectionId;
+var req, clientId;
+
 function startstream() {
-   connectionId = generateUniqueId();
    req = new Request({
-      url: "/server_push"
+      url: "/server_push",
+      onSuccess: function (js) {
+         eval(js)
+         startstream();
+      }
    });
    req.get({
-      id: connectionId,
+      clientId: clientId,
       prop: Math.floor(Math.random() * 1024)
    });
 }
@@ -34,15 +38,16 @@ function generateUniqueId() {
    return id;
 }
 
-function setClientId(id) {
-   window.clientId = id;
-   $('clientId').set('value', id);
-}
-
 var lastmsglength = 0;
 window.addEvent('domready', function () {
-    startstream();
-    $('sendForm').addEvent('submit', function (evt) {
+   //-- Generate unique clientId
+   clientId = generateUniqueId();
+   $('clientId').set('value', clientId);
+   
+   //-- Start the stream
+   startstream();
+   
+   $('sendForm').addEvent('submit', function (evt) {
       var req = new Request({
          url: this.get('action'),
          onRequest: function () {
@@ -50,9 +55,10 @@ window.addEvent('domready', function () {
          }
       });
       req.send(this);
-      
-    });
+   });
+    /*
     (function () {
+       try {
        var content = req.xhr.responseText.substr(lastmsglength, req.xhr.responseText.length);
        //console.log(content);
        lastmsglength = req.xhr.responseText.length;
@@ -68,7 +74,10 @@ window.addEvent('domready', function () {
        } else {
          //-- Did the connection die?
        }
+       } catch (err) {
+       }
     }).periodical(250);
+    */
 });
 </script>
 </body>
