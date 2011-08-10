@@ -29,11 +29,48 @@ with "aws";
 
 project Ws is
 
+   type Library_Kind is
+      ("relocatable", "static");
+   type Target_Type is
+      ("native", "vxworks");
+   type Ssl_Library_Kind is
+      ("relocatable", "static");
    for Source_Dirs use (".");
    for Main use ("ws.adb");
+   SSL_LIBRARY_TYPE : Ssl_Library_Kind := external ("SSL_LIBRARY_TYPE");
+   PLATFORM : Target_Type := external ("PLATFORM");
+   LIBRARY_TYPE : Library_Kind := external ("LIBRARY_TYPE");
 
    package Builder is
-      for Default_Switches ("Ada") use ("-gnat05", "-O3");
+      for Default_Switches ("ada") use ("-gnat05", "-g");
    end Builder;
 
+   package Compiler is
+
+      case SSL_LIBRARY_TYPE is
+
+         when "relocatable" =>
+
+            case PLATFORM is
+
+               when "native" =>
+
+                  case LIBRARY_TYPE is
+
+                     when "relocatable" =>
+
+                     when "static" =>
+                        for Default_Switches ("ada") use ("-gnatwal", "-gnatVa", "-gnato", "-gnatf", "-gnat05", "-fcallgraph-info=su,da", "-gnatyxutSsrpOonlkIihfedCcBbAa", "-g");
+                  end case;
+
+               when "vxworks" =>
+
+            end case;
+
+         when "static" =>
+
+      end case;
+   end Compiler;
+
 end Ws;
+

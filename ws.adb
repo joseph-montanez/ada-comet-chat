@@ -43,7 +43,7 @@ procedure WS is
    task type Monitor_Push_Task is
       entry Start;
    end Monitor_Push_Task;
-   
+
    task body Monitor_Push_Task is
    begin
       accept Start;
@@ -57,13 +57,13 @@ procedure WS is
             select
                Server_Push_Task.Push;
             or
-               delay 1.0;
+               delay 0.15;
                Text_IO.Put_Line ("Too busy");
             end select;
          end;
       end loop;
    end Monitor_Push_Task;
-   
+
    Monitor : Monitor_Push_Task;
 begin
    Text_IO.Put_Line ("AWS " & AWS.Version);
@@ -74,9 +74,9 @@ begin
                      Config     => Conf);
 
    Text_IO.Put_Line ("Press Q to terminate.");
-   
+
    Monitor.Start;
-   
+
    AWS.Server.Wait (AWS.Server.Q_Key_Pressed);
 
    AWS.Server.Shutdown (WS_CB.WS);

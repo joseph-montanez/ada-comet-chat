@@ -28,10 +28,16 @@
 with AWS.Response;
 with AWS.Server;
 with AWS.Status;
+with Client;
 
 package WS_CB is
 
    WS : AWS.Server.HTTP;
+
+   function "=" (A, B : Client.Object) return Boolean;
+
+   function Get (Request : AWS.Status.Data) return AWS.Response.Data;
+   function Put (Request : AWS.Status.Data) return AWS.Response.Data;
 
    task type Server_Push_Task_Type is
       entry Push;

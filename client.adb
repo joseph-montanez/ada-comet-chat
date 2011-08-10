@@ -1,6 +1,9 @@
-with Ada.Containers.Indefinite_Vectors;
-
 package body Client is
+
+   procedure Add_Buffer (Self : in out Object; Message : String) is
+   begin
+      Self.Buffer.Append (New_Item => Message);
+   end Add_Buffer;
 
    function Get_Client_Id (Self : Object) return String is
    begin
@@ -21,9 +24,4 @@ package body Client is
    begin
       Self.Connection_Id := Connection_Id;
    end Set_Connection_Id;
-
-   procedure Add_Buffer (Self : in out Object; Message : String) is
-   begin
-      Self.Buffer.Append (New_Item => Message);
-   end Add_Buffer;
 end Client;

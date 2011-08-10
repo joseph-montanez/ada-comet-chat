@@ -28,28 +28,19 @@
 with Ada.Calendar;
 with Ada.Streams;
 with Ada.Strings.Unbounded;
-with Ada.Strings.Fixed;
 with Ada.Integer_Text_IO;
 with Ada.Text_IO;
 with Ada.Containers.Indefinite_Hashed_Maps;
 with Ada.Strings.Hash;
 with Ada.Exceptions;
 
-with GNAT.Calendar.Time_IO;
-
-with AWS.Config;
-with AWS.OS_Lib;
 with AWS.Messages;
-with AWS.MIME;
 with AWS.Parameters;
-with AWS.Services.Directory;
 with AWS.Server.Push;
 with AWS.Translator;
-with AWS.Utils;
-with Ada.Containers.Vectors;
-with Ada.Containers.Indefinite_Vectors;
 with Templates_Parser;
-with Client;
+
+pragma Elaborate_All (AWS.Server.Push);
 
 package body WS_CB is
 
@@ -57,6 +48,7 @@ package body WS_CB is
    use Ada.Strings.Unbounded;
    use Ada.Calendar;
    use Ada.Containers;
+   use Ada.Text_IO;
 
    type Client_Env is record
       Start   : Time;
@@ -66,7 +58,7 @@ package body WS_CB is
    function "=" (A, B : Client.Object) return Boolean is
    begin
       return A.Get_Client_Id = B.Get_Client_Id;
-   end;
+   end "=";
 
    package Clients_Map is new Indefinite_Hashed_Maps (
                                                       Key_Type        => String,
@@ -76,23 +68,9 @@ package body WS_CB is
                                                      );
    use Clients_Map;
 
-
-   package Messages_Container is new Indefinite_Vectors (
-                                                         Index_Type => Natural,
-                                                         Element_Type => String
-                                                        );
-   use Messages_Container;
-
    Clients  : Clients_Map.Map;
-   Messages : Messages_Container.Vector;
 
    --  Simple ID generator
-
-   function Js (Code : String) return String is
-   begin
-      return "<script type=""text/javascript"">" & Code & "</script>";
-   end;
-
    protected New_Connection_Id is
       procedure Get (New_Id : out String);
    private
@@ -126,27 +104,44 @@ package body WS_CB is
          return AWS.Response.Build ("text/html", Html);
       elsif URI = "/send" then
          declare
+            Now                 : Ada.Calendar.Time;
             P_List              : constant AWS.Parameters.List
               := AWS.Status.Parameters (Request);
-            Picture             : Unbounded_String
-              := To_Unbounded_String (AWS.Parameters.Get_Value (P_List));
             Msg                 : Unbounded_String;
-            Client_Object_Index : Clients_Map.Cursor;
-            Client_Object       : Client.Object;
+            Session_Index : Clients_Map.Cursor;
+            Session       : Client.Object;
          begin
+            Now := Ada.Calendar.Clock;
             Append (Msg, AWS.Parameters.Get (P_List, "clientId"));
             Append (Msg, ": ");
             Append (Msg, AWS.Parameters.Get (P_List, "msg"));
             Append (Msg, "<br>");
-            -- Add the message to all clients
+            --  Add the message to all clients
             if Clients_Map.Length (Clients) /= 0 then
-               Client_Object_Index := Clients.First;
-               while Client_Object_Index /= Clients_Map.No_Element loop
-                  Ada.Text_IO.Put_Line ("Boop");
-                  Client_Object := Element (Client_Object_Index);
-                  Client_Object.Add_Buffer (To_String (Msg));
-                  Clients.Replace_Element (Client_Object_Index, Client_Object);
-                  Client_Object_Index := Clients_Map.Next (Client_Object_Index);
+               Session_Index := Clients.First;
+               while Session_Index /= Clients_Map.No_Element loop
+                  Put_Line ("Boop");
+                  Session := Element (Session_Index);
+
+                  --  If there connection is older then 5 seconds, kill it off from the
+                  --  message queue
+                  if Session.Is_Connected = False then
+                     --  Put_Line (Duration'Image (Now - Session.Last_Connected));
+                     if Now - Session.Last_Connected > 5.0 then
+                        Put_Line ("KILL: " & Session.Get_Connection_Id);
+                        Clients.Delete (Position => Session_Index);
+                     end if;
+                  else
+                     Put_Line ("Adding buffer " & To_String (Msg));
+                     Session.Add_Buffer (To_String (Msg));
+                     --  During the time this was last checked until now
+                     --  the client may have been removed...
+                     --  if Clients.Has_Element (Session_Index) then
+
+                        Clients.Replace_Element (Session_Index, Session);
+                     --  end if;
+                  end if;
+                  Session_Index := Clients_Map.Next (Session_Index);
                end loop;
             end if;
             return AWS.Response.Build ("text/html",
@@ -156,13 +151,10 @@ package body WS_CB is
       elsif URI = "/server_push" then
 
          declare
-            use GNAT.Calendar;
-            use GNAT.Calendar.Time_IO;
-            use Ada.Calendar;
 
             P_List        : constant AWS.Parameters.List
               := AWS.Status.Parameters (Request);
-            Picture       : Unbounded_String
+            Picture       : constant Unbounded_String
               := To_Unbounded_String (AWS.Parameters.Get_Value (P_List));
             Client_Id     : String (1 .. 16);
             Connection_Id : String (1 .. 32);
@@ -171,17 +163,20 @@ package body WS_CB is
          begin
             New_Connection_Id.Get (Connection_Id);
             Client_Id := AWS.Parameters.Get (P_List, "clientId");
-            -- Make sure the client doesn't already exist
+            --  Make sure the client doesn't already exist
             if Clients.Contains (Key => Client_Id) then
                Session_Index := Clients.Find (Client_Id);
                Session := Clients_Map.Element (Session_Index);
+               Session.Set_Connection_Id (Connection_Id);
                Session.Is_Connected := True;
+               Session.Last_Connected := Ada.Calendar.Clock;
                Clients.Replace_Element (Session_Index, Session);
             else
-               -- Add the client to the Clients list
+               --  Add the client to the Clients list
                Session.Set_Client_Id (Client_Id);
                Session.Set_Connection_Id (Connection_Id);
                Session.Is_Connected := True;
+               Session.Last_Connected := Ada.Calendar.Clock;
                Clients.Insert (
                                Client_Id, Session
                               );
@@ -250,7 +245,7 @@ package body WS_CB is
    procedure Stop_Push_Server is
    begin
       null;
-      --abort Server_Push_Task;
+      --  abort Server_Push_Task;
    end Stop_Push_Server;
 
    --------------
@@ -267,81 +262,71 @@ package body WS_CB is
                                                 );
    end To_Array;
 
-   procedure Check_Client (Client_Id : String) is
-   begin
-      -- This is wherre you would do clean up
-      Clients.Delete (Client_Id);
-      Ada.Text_IO.Put_Line ("Client Gone: " & Client_Id);
-   end;
-
    ----------------------
    -- Server_Push_Task --
    ----------------------
 
    task body Server_Push_Task_Type is
-      use GNAT.Calendar;
       use Client.Buffer_Container;
-      Now                 : Ada.Calendar.Time;
       Msg                 : Unbounded_String;
       Data                : Unbounded_String;
       Index               : Client.Buffer_Container.Cursor;
-      -- Client Stuff
-      Client_Object_Index : Clients_Map.Cursor;
-      Client_Object       : Client.Object;
+      --  Client Stuff
+      Session_Index : Clients_Map.Cursor;
+      Session       : Client.Object;
       Connection_Id       : String (1 .. 32);
    begin
       accept Push;
-      Now := Ada.Calendar.Clock;
 
-      -- Because IE does not impliment partial responses we have to disconnect
-      -- every connection and ask for a new one... fun!
-      Client_Object_Index := Clients.First;
-      while Client_Object_Index /= Clients_Map.No_Element loop
-         Client_Object := Element (Client_Object_Index);
-         Connection_Id := Client_Object.Get_Connection_Id;
+      --  Because IE does not impliment partial responses we have to disconnect
+      --  every connection and ask for a new one... fun!
+      Session_Index := Clients.First;
+      while Session_Index /= Clients_Map.No_Element loop
+         Session := Element (Session_Index);
+         Connection_Id := Session.Get_Connection_Id;
 
-         if Client_Object.Is_Connected = True then
+         --  Put_Line ("Connections: " & Chat.Count(Server => SP)'Img);
+
+         if Session.Is_Connected then
             Data  := To_Unbounded_String ("");
             Msg   := To_Unbounded_String ("");
-            Index := Client_Object.Buffer.First;
+            Index := Session.Buffer.First;
 
-            --Ada.Text_IO.Put_Line (Client.Buffer_Container.Length (Client_Object.Buffer)'Img);
+            --  Put_Line (Client.Buffer_Container.Length (Session.Buffer)'Img);
             while Index /= Client.Buffer_Container.No_Element loop
                Append (Msg, To_Unbounded_String (Element (Index)));
-               Client_Object.Buffer.Delete (Index);
+               Session.Buffer.Delete (Index);
                Index := Client.Buffer_Container.Next (Index);
             end loop;
-            -- TODO: the buffer doesn't seem to be deleted?
-            --Ada.Text_IO.Put_Line (Length (Msg)'Img);
+            --  TODO: the buffer doesn't seem to be deleted?
+            --  Put_Line (Length (Msg)'Img);
             if Length (Msg) /= 0 then
-               -- TODO: must escape double quotes
+               --  TODO: must escape double quotes
                Append (Data, "document.getElementById(""messages"").innerHTML += """);
                Append (Data, Msg);
                Append (Data, """;");
-               Ada.Text_IO.Put_Line (To_String (Data));
-               Ada.Text_IO.Put_Line ("Connection: " & Connection_Id);
-               -- Send to the client
-               Ada.Text_IO.Put_Line ("Sending");
+               --  Send to the client
+               Put_Line ("Sending to " & Connection_Id);
                Chat.Send_To (
-                                  Server       => SP,
-                                  Client_Id    => Connection_Id,
-                                  Data         => Data,
-                                  Content_Type => "text/html"
-                                 );
-               -- Force a disconnect, to allow them to reconnect for other
-               -- messages
-               Ada.Text_IO.Put_Line ("Disconnecting");
+                             Server       => SP,
+                             Client_Id    => Connection_Id,
+                             Data         => Data
+                            );
+               --  Force a disconnect, to allow them to reconnect for other
+               --  messages
+               Put_Line ("Disconnecting ...");
                Chat.Unregister (
-                                     Server    => SP,
-                                     Client_Id => Connection_Id
-                                    );
-               Ada.Text_IO.Put_Line ("Disconnected");
-               Client_Object.Is_Connected := False;
-               Clients.Replace_Element (Client_Object_Index, Client_Object);
+                                Server    => SP,
+                                Client_Id => Connection_Id
+                               );
+               Session.Is_Connected := False;
+               Clients.Replace_Element (Session_Index, Session);
             end if;
-
-            Client_Object_Index := Clients_Map.Next (Client_Object_Index);
+         else
+            Put_Line ("Not Connected: " & Connection_Id);
          end if;
+
+         Session_Index := Clients_Map.Next (Session_Index);
       end loop;
    end Server_Push_Task_Type;
 
