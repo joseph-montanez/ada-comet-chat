@@ -355,8 +355,10 @@ package body WS_CB is
       Session_Index       : Clients_Map.Cursor;
       Session             : Client.Object;
       Connection_Id       : String (1 .. 32);
+      Now                 : Ada.Calendar.Time;
    begin
       accept Push;
+      Now := Ada.Calendar.Clock;
 
       --  Because IE does not impliment partial responses we have to disconnect
       --  every connection and ask for a new one... fun!
@@ -395,7 +397,7 @@ package body WS_CB is
                              Content_Type => "text/html"
                             );
                --  Chrome requires us send a zero byte response
-               --  To end the chunked data stream...
+               --  To end the chunked data stream correctly...
                Chat.Send_To (
                              Server       => SP,
                              Client_Id    => Connection_Id,
@@ -415,6 +417,10 @@ package body WS_CB is
          else
             --  Todo: Check to see if session has expired
             Put_Line ("Not Connected: " & Connection_Id);
+            if Now - Session.Last_Connected > 5.0 then
+               Put_Line ("KILL: " & Session.Get_Connection_Id);
+               Clients.Delete (Position => Session_Index);
+            end if;
          end if;
 
          Session_Index := Clients_Map.Next (Session_Index);
