@@ -11,11 +11,11 @@ Requirements
 
 Linux (Only OS I have to test on)
 Ada Gnat Compiler 4.4+
-AWS 2.7.0w+
+AWS 2.10.0w
 
 Compiling on Ubuntu
 -------------------
-1.  sudo apt-get install libaws2.7-dev
+<del>1.  sudo apt-get install libaws2.7-dev</del> (too old)
 2.  make
 3.  ./ws
 4.  Profit!

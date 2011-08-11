@@ -24,6 +24,9 @@
 #  however invalidate any other reasons why the executable file  might be  #
 #  covered by the  GNU Public License.                                     #
 ############################################################################
+export SSL_LIBRARY_TYPE=relocatable
+export PLATFORM=native
+export LIBRARY_TYPE=static
 
 all:
 	gnat make -P ws

@@ -183,6 +183,7 @@ package body WS_CB is
                   Append (Msg, ": ");
                end if;
                if P_List.Exist (Name => "msg") then
+                  Put_Line (AWS.Parameters.Get (P_List, "msg"));
                   Append (Msg, AWS.Parameters.Get (P_List, "msg"));
                   Append (Msg, "<br>");
                end if;
@@ -257,11 +258,12 @@ package body WS_CB is
             end if;
 
             Chat.Register (
-                           Server      => SP,
-                           Client_Id   => Connection_Id,
-                           Socket      => AWS.Status.Socket (Request),
-                           Environment => (Clock, Picture),
-                           Kind        => Chat.Chunked
+                           Server       => SP,
+                           Client_Id    => Connection_Id,
+                           Socket       => AWS.Status.Socket (Request),
+                           Environment  => (Clock, Picture),
+                           Content_Type => "text/html",
+                           Kind         => Chat.Chunked
                           );
 
          end;
@@ -385,10 +387,20 @@ package body WS_CB is
                Append (Data, """;");
                --  Send to the client
                Put_Line ("Sending to " & Connection_Id);
+               Put_Line (To_String (Data));
                Chat.Send_To (
                              Server       => SP,
                              Client_Id    => Connection_Id,
-                             Data         => Data
+                             Data         => Data,
+                             Content_Type => "text/html"
+                            );
+               --  Chrome requires us send a zero byte response
+               --  To end the chunked data stream...
+               Chat.Send_To (
+                             Server       => SP,
+                             Client_Id    => Connection_Id,
+                             Data         => To_Unbounded_String (""),
+                             Content_Type => "text/html"
                             );
                --  Force a disconnect, to allow them to reconnect for other
                --  messages
