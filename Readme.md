@@ -10,7 +10,7 @@ Requirements
 ------------
 
 Linux (Only OS I have to test on)
-Ada Gnat Compiler 4.4+
+Ada Gnat Compiler 2011
 AWS 2.10.0w
 
 Compiling on Ubuntu
