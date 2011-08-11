@@ -1,5 +1,5 @@
 #!/bin/bash
-for i in `seq 1 900`
+for i in `seq 1 50`
 do
    r=( $(openssl rand 100000 | sha1sum) ); 
    id=`printf "%s${r[0]:0:16}\n"`

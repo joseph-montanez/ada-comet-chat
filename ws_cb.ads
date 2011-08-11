@@ -30,6 +30,8 @@ with AWS.Server;
 with AWS.Status;
 with Client;
 
+pragma Elaborate_All (AWS.Server);
+
 package WS_CB is
 
    WS : AWS.Server.HTTP;
@@ -38,6 +40,9 @@ package WS_CB is
 
    function Get (Request : AWS.Status.Data) return AWS.Response.Data;
    function Put (Request : AWS.Status.Data) return AWS.Response.Data;
+   subtype Params_String is String (1 .. 10);
+   type Params_Strings is
+     array (Positive range <>) of Params_String;
 
    task type Server_Push_Task_Type is
       entry Push;

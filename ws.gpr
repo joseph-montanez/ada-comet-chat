@@ -29,17 +29,17 @@ with "aws";
 
 project Ws is
 
-   type Library_Kind is
-      ("relocatable", "static");
-   type Target_Type is
-      ("native", "vxworks");
-   type Ssl_Library_Kind is
-      ("relocatable", "static");
    for Source_Dirs use (".");
    for Main use ("ws.adb");
-   SSL_LIBRARY_TYPE : Ssl_Library_Kind := external ("SSL_LIBRARY_TYPE");
-   PLATFORM : Target_Type := external ("PLATFORM");
-   LIBRARY_TYPE : Library_Kind := external ("LIBRARY_TYPE");
+   type Ssl_Library_Kind is
+      ("relocatable", "static");
+   Ssl_Library_Type : Ssl_Library_Kind := external ("SSL_LIBRARY_TYPE");
+   type Target_Type is
+      ("native", "vxworks");
+   Platform : Target_Type := external ("PLATFORM");
+   type Library_Kind is
+      ("relocatable", "static");
+   Library_Type : Library_Kind := external ("LIBRARY_TYPE");
 
    package Builder is
       for Default_Switches ("ada") use ("-gnat05", "-g");
@@ -47,20 +47,20 @@ project Ws is
 
    package Compiler is
 
-      case SSL_LIBRARY_TYPE is
+      case Ssl_Library_Type is
 
          when "relocatable" =>
 
-            case PLATFORM is
+            case Platform is
 
                when "native" =>
 
-                  case LIBRARY_TYPE is
+                  case Library_Type is
 
                      when "relocatable" =>
 
                      when "static" =>
-                        for Default_Switches ("ada") use ("-gnatwal", "-gnatVa", "-gnato", "-gnatf", "-gnat05", "-fcallgraph-info=su,da", "-gnatyxutSsrpOonlkIihfedCcBbAa", "-g");
+                        for Default_Switches ("ada") use ("-gnatwald", "-gnatVa", "-gnato", "-gnatf", "-gnat05", "-fcallgraph-info=su,da", "-gnatyxutSsrpOonlkIihfedCcBbAa", "-g", "-fstack-check");
                   end case;
 
                when "vxworks" =>

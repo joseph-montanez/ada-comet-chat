@@ -32,6 +32,7 @@ with Ada.Integer_Text_IO;
 with Ada.Text_IO;
 with Ada.Containers.Indefinite_Hashed_Maps;
 with Ada.Strings.Hash;
+with Ada.Strings.Fixed;
 with Ada.Exceptions;
 
 with AWS.Messages;
@@ -102,47 +103,120 @@ package body WS_CB is
       if URI = "/" then
          Html := To_Unbounded_String (Tpl.Parse ("index.html", T));
          return AWS.Response.Build ("text/html", Html);
-      elsif URI = "/send" then
+         --  Returns the list of clients connected
+      elsif URI = "/list" then
          declare
-            Now                 : Ada.Calendar.Time;
-            P_List              : constant AWS.Parameters.List
-              := AWS.Status.Parameters (Request);
-            Msg                 : Unbounded_String;
-            Session_Index : Clients_Map.Cursor;
-            Session       : Client.Object;
+            Session_Index  : Clients_Map.Cursor;
+            Session        : Client.Object;
          begin
-            Now := Ada.Calendar.Clock;
-            Append (Msg, AWS.Parameters.Get (P_List, "clientId"));
-            Append (Msg, ": ");
-            Append (Msg, AWS.Parameters.Get (P_List, "msg"));
-            Append (Msg, "<br>");
             --  Add the message to all clients
             if Clients_Map.Length (Clients) /= 0 then
                Session_Index := Clients.First;
                while Session_Index /= Clients_Map.No_Element loop
-                  Put_Line ("Boop");
                   Session := Element (Session_Index);
-
-                  --  If there connection is older then 5 seconds, kill it off from the
-                  --  message queue
-                  if Session.Is_Connected = False then
-                     --  Put_Line (Duration'Image (Now - Session.Last_Connected));
-                     if Now - Session.Last_Connected > 5.0 then
-                        Put_Line ("KILL: " & Session.Get_Connection_Id);
-                        Clients.Delete (Position => Session_Index);
-                     end if;
-                  else
-                     Put_Line ("Adding buffer " & To_String (Msg));
-                     Session.Add_Buffer (To_String (Msg));
-                     --  During the time this was last checked until now
-                     --  the client may have been removed...
-                     --  if Clients.Has_Element (Session_Index) then
-
-                        Clients.Replace_Element (Session_Index, Session);
-                     --  end if;
-                  end if;
+                  Append (Html, Session.Get_Client_Id);
+                  --  Append (Html, Session.Get_Client_Id);
+                  Append (Html, ASCII.LF);
                   Session_Index := Clients_Map.Next (Session_Index);
                end loop;
+            end if;
+         end;
+
+         return AWS.Response.Build ("text/html", Html);
+         --  Send to a client
+      elsif URI = "/send-to" then
+         --           declare
+         --              Now             : Ada.Calendar.Time;
+         --              P_List          : constant AWS.Parameters.List
+         --                := AWS.Status.Parameters (Request);
+         --              Msg             : Unbounded_String;
+         --              Session_Index   : Clients_Map.Cursor;
+         --              Session         : Client.Object;
+         --              Req_Params      : constant Params_Strings := (
+         --                                                            "clientId  ",
+         --                                                            "msg       ",
+         --                                                            "toClientId"
+         --                                                           );
+         --              Req_Param       : Params_String;
+         --              Req_Params_Meet : Boolean;
+         --           begin
+         --              null;
+         --           end;
+         return AWS.Response.Build ("text/html",
+                                    To_Unbounded_String ("Good")
+                                   );
+         --  Send to all clients
+      elsif URI = "/send" then
+         declare
+            Now             : Ada.Calendar.Time;
+            P_List          : constant AWS.Parameters.List
+              := AWS.Status.Parameters (Request);
+            Msg             : Unbounded_String;
+            Session_Index   : Clients_Map.Cursor;
+            Session         : Client.Object;
+            --  Requires params to execute this request
+            Req_Params      : constant Params_Strings := (
+                                                          "clientId  ",
+                                                          "msg       "
+                                                         );
+            Req_Param       : Params_String;
+            Req_Params_Meet : Boolean;
+         begin
+            Now := Ada.Calendar.Clock;
+            --  Varify all parameters are in the request
+            Req_Params_Meet := True;
+            for Req_Param_Index in Req_Params'Range loop
+               Req_Param := Req_Params (Req_Param_Index);
+               if P_List.Exist (Name => Ada.Strings.Fixed.Trim (
+                                Req_Param, Ada.Strings.Right
+                               )) = False then
+                  Req_Params_Meet := False;
+               end if;
+               Put_Line ("'" & Ada.Strings.Fixed.Trim (
+                 Req_Param, Ada.Strings.Right
+                ) & "'");
+            end loop;
+
+            if Req_Params_Meet then
+               if P_List.Exist (Name => "clientId") then
+                  Append (Msg, P_List.Get (Name => "clientId"));
+                  Append (Msg, ": ");
+               end if;
+               if P_List.Exist (Name => "msg") then
+                  Append (Msg, AWS.Parameters.Get (P_List, "msg"));
+                  Append (Msg, "<br>");
+               end if;
+
+               --  Add the message to all clients
+               if Clients_Map.Length (Clients) /= 0 then
+                  Session_Index := Clients.First;
+                  while Session_Index /= Clients_Map.No_Element loop
+                     Put_Line ("Boop");
+                     Session := Element (Session_Index);
+
+                     --  If there connection is older then 5 seconds, kill it
+                     --  off from the message queue
+                     if Session.Is_Connected = False then
+                        --  Put_Line (Duration'Image (Now - Session.Last_Connected));
+                        if Now - Session.Last_Connected > 5.0 then
+                           Put_Line ("KILL: " & Session.Get_Connection_Id);
+                           Clients.Delete (Position => Session_Index);
+                        end if;
+                     else
+                        Put_Line ("Adding buffer " & To_String (Msg));
+                        Session.Add_Buffer (To_String (Msg));
+                        --  During the time this was last checked until now
+                        --  the client may have been removed...
+                        --  if Clients.Has_Element (Session_Index) then
+
+                        Clients.Replace_Element (Session_Index, Session);
+                        --  end if;
+                     end if;
+                     Session_Index := Clients_Map.Next (Session_Index);
+                  end loop;
+               end if;
+            else
+               Put_Line ("Bad params");
             end if;
             return AWS.Response.Build ("text/html",
                                        To_Unbounded_String ("Good")
@@ -257,6 +331,10 @@ package body WS_CB is
       Env  : Client_Env) return Ada.Streams.Stream_Element_Array
    is
    begin
+      --  I know I'm not using this :\ but please stop warning about it?
+      if Env.Start - Ada.Calendar.Clock > 0.00 then
+         null;
+      end if;
       return Translator.To_Stream_Element_Array (
                                                  To_String (Str)
                                                 );
@@ -272,8 +350,8 @@ package body WS_CB is
       Data                : Unbounded_String;
       Index               : Client.Buffer_Container.Cursor;
       --  Client Stuff
-      Session_Index : Clients_Map.Cursor;
-      Session       : Client.Object;
+      Session_Index       : Clients_Map.Cursor;
+      Session             : Client.Object;
       Connection_Id       : String (1 .. 32);
    begin
       accept Push;
@@ -323,6 +401,7 @@ package body WS_CB is
                Clients.Replace_Element (Session_Index, Session);
             end if;
          else
+            --  Todo: Check to see if session has expired
             Put_Line ("Not Connected: " & Connection_Id);
          end if;
 
