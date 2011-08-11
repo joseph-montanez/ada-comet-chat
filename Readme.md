@@ -15,7 +15,7 @@ AWS 2.10.0w
 
 Compiling on Ubuntu
 -------------------
-<del>1.  sudo apt-get install libaws2.7-dev</del> (too old)
+1.  <del>sudo apt-get install libaws2.7-dev</del> (too old)
 2.  make
 3.  ./ws
 4.  Profit!
